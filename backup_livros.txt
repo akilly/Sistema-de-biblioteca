@@ -1,0 +1,10 @@
+//livros.txt: codigo;titulo;autor;editora;ano;exemplares;emprestados
+
+1001;João Silva;Engenharia;11999990001;01/10/2025
+1002;Maria Souza;Medicina;11999990002;02/10/2025
+1003;Pedro Santos;Direito;11999990003;03/10/2025
+1004;Ana Oliveira;Computação;11999990004;04/10/2025
+1005;Lucas Lima;Administração;11999990005;05/10/2025
+1000;Joao;eng;2342;07/10/2025
+
+

@@ -1,0 +1,5 @@
+// emprestimos.txt: codigoEmp;matriculaUsuario;codigoLivro;dataEmp;dataDev;status
+
+1;1001;1;01/10/2025;08/10/2025;devolvido
+2;1003;3;02/10/2025;09/10/2025;devolvido
+3;1004;4;03/10/2025;10/10/2025;devolvido
