@@ -295,6 +295,52 @@ void pesquisarLivro() {
     if(!encontrado) printf("Livro não encontrado.\n");
 }
 
+void pesquisarUsuario(){
+    int opc;
+    printf("Pesquisar por:\n1 - Nome\n2 - Matrícula\nEscolha: ");
+    scanf("%d", &opc);
+    limparBuffer();
+
+    int encontrou = 0;
+
+    if(opc == 1){
+        char nome[101];
+        printf("Nome: ");
+        fgets(nome, sizeof(nome), stdin);
+        nome[strcspn(nome, "\n")] = '\0'; // remove \n
+
+        for(int i = 0; i < totalUsuarios; i++){
+            if(strcasecmp(usuarios[i].nome, nome) == 0){ // uso de strcasecmp para comparação sem case sensitive
+                printf("Aluno: %s | Matrícula: %d | Curso: %s | Telefone: %s | Cadastro: %s\n",
+                       usuarios[i].nome, usuarios[i].matricula, usuarios[i].curso,
+                       usuarios[i].telefone, usuarios[i].dataCadastro);
+                encontrou = 1;
+            }
+        }
+    } else if(opc == 2){
+        int mat;
+        printf("Matrícula: ");
+        scanf("%d", &mat);
+
+        for(int i = 0; i < totalUsuarios; i++){
+            if(usuarios[i].matricula == mat){
+                printf("Aluno: %s | Matrícula: %d | Curso: %s | Telefone: %s | Cadastro: %s\n",
+                       usuarios[i].nome, usuarios[i].matricula, usuarios[i].curso,
+                       usuarios[i].telefone, usuarios[i].dataCadastro);
+                encontrou = 1;
+                break;
+            }
+        }
+    } else {
+        printf("Opção inválida!\n");
+        return;
+    }
+
+    if(!encontrou){
+        printf("Usuário não encontrado.\n");
+    }
+}
+
 // ===================== Listagens =====================
 void listarEmprestimosAtivos() {
     int encontrou=0;
@@ -334,18 +380,72 @@ void listarUsuarios() {
     printf("\n===== Usuários Cadastrados =====\n");
     printf("Matrícula | Nome\n");
     for(int i=0;i<totalUsuarios;i++){
-        printf("%d | %s\n", usuarios[i].matricula, usuarios[i].nome);
+        printf("%d | %s | %s\n", usuarios[i].matricula, usuarios[i].nome, usuarios[i].telefone);
         encontrou=1;
     }
     if(!encontrou) printf("Nenhum usuário cadastrado.\n");
 }
 
+// ===================== Verificar pendencias ===============
+
+void gerarRelatorioPendencias() {
+    FILE *f = fopen("pendencias.txt", "w");
+    if (!f) {
+        printf("[ERRO] Não foi possível criar o arquivo de pendências.\n");
+        return;
+    }
+
+    time_t t = time(NULL);
+    struct tm *dataAtual = localtime(&t);
+    char hoje[11];
+    snprintf(hoje, sizeof(hoje), "%02d/%02d/%04d", dataAtual->tm_mday, dataAtual->tm_mon + 1, dataAtual->tm_year + 1900);
+
+    int encontrou = 0;
+
+    for (int i = 0; i < totalEmprestimos; i++) {
+        if (strcmp(emprestimos[i].status, "ativo") == 0 && strcmp(emprestimos[i].dataDevolucao, hoje) < 0) {
+            Usuario *u = NULL;
+            Livro *l = NULL;
+
+            for (int j = 0; j < totalUsuarios; j++)
+                if (usuarios[j].matricula == emprestimos[i].matriculaUsuario) {
+                    u = &usuarios[j];
+                    break;
+                }
+
+            for (int j = 0; j < totalLivros; j++)
+                if (livros[j].codigo == emprestimos[i].codigoLivro) {
+                    l = &livros[j];
+                    break;
+                }
+
+            if (u && l) {
+                fprintf(f, "Usuário: %s | Matrícula: %d | Telefone: %s\n", u->nome, u->matricula, u->telefone);
+                fprintf(f, "Livro: %s | Código: %d | Data de devolução: %s\n\n", l->titulo, l->codigo, emprestimos[i].dataDevolucao);
+                printf("============================\nUsuário: %s | Matrícula: %d | Telefone: %s\n", u->nome, u->matricula, u->telefone);
+                printf("Livro: %s | Código: %d | Data de devolução: %s\n\n", l->titulo, l->codigo, emprestimos[i].dataDevolucao);
+                encontrou = 1;
+            }
+        }
+    }
+
+    fclose(f);
+
+    if (!encontrou) {
+        printf("[INFO] Nenhuma pendência encontrada.\n");
+        remove("pendencias.txt"); // remove o arquivo se estiver vazio
+    } else {
+        printf("[INFO] Pendências atualizadas no arquivo 'pendencias.txt'.\n");
+    }
+}
+
+
 // ===================== Menu =====================
 void menu() {
     printf("\n===== Biblioteca =====\n");
     printf("1. Cadastrar Livro\n2. Cadastrar Usuário\n3. Realizar Empréstimo\n4. Realizar Devolucão\n");
-    printf("5. Pesquisar Livro\n6. Pesquisar Usuário\n7. Listar Empréstimos Ativos\n8. Listar Livros Emprestados\n");
-    printf("9. Listar Livros Disponíveis\n10. Listar Usuários\n0. Sair\n");
+    printf("5. Pesquisar Livro\n6. Pesquisar Usuário\n7. Listar Empréstimos Ativos\n");
+    printf("8. Listar Livros Disponíveis\n9. Listar Usuários\n10. Verificar pendencias\n0. Sair\n");
     printf("Escolha uma opção: ");
 }
 
@@ -362,11 +462,11 @@ int main() {
             case 3: realizarEmprestimo(); break;
             case 4: realizarDevolucao(); break;
             case 5: pesquisarLivro(); break;
-            case 6: /* pesquisar usuario */ break;
+            case 6: pesquisarUsuario(); break;
             case 7: listarEmprestimosAtivos(); break;
-            case 8: /* listar livros emprestados */ break;
-            case 9: listarLivrosDisponiveis(); break;
-            case 10: listarUsuarios(); break;
+            case 8: listarLivrosDisponiveis(); break;
+            case 9: listarUsuarios(); break;
+            case 10: gerarRelatorioPendencias(); break;
             case 0: printf("Saindo...\n"); break;
             default: printf("Opção inválida!\n");
         }
