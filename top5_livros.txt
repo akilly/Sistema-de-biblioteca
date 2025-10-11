@@ -1,0 +1,6 @@
+Código | Título                        | Empréstimos | Autor               
+1      | O Senhor dos Anéis            | 1          | J.R.R. Tolkien      
+2      | Dom Casmurro                   | 1          | Machado de Assis    
+3      | 1984                           | 1          | George Orwell       
+4      | A Revolução dos Bichos       | 1          | George Orwell       
+5      | O Pequeno Príncipe            | 1          | Antoine de Saint-Exupéry

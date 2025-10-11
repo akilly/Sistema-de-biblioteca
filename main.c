@@ -23,15 +23,15 @@ typedef struct {
     char nome[101];
     char curso[51];
     char telefone[16];
-    char dataCadastro[11]; // dd/mm/aaaa
+    char dataCadastro[12]; // dd/mm/aaaa + '\0'
 } Usuario;
 
 typedef struct {
     int codigoEmprestimo;
     int matriculaUsuario;
     int codigoLivro;
-    char dataEmprestimo[11]; // dd/mm/aaaa
-    char dataDevolucao[11];  // dd/mm/aaaa
+    char dataEmprestimo[12]; // dd/mm/aaaa + '\0'
+    char dataDevolucao[20];  // dd/mm/aaaa + '\0'
     char status[10];         // ativo ou devolvido
 } Emprestimo;
 
@@ -58,6 +58,13 @@ int codigoLivroJaExiste(int codigo){
         if(livros[i].codigo == codigo) return 1;
     return 0;
 }
+
+// ===================== Função para formatar datas =====================
+void formatarData(int dia, int mes, int ano, char* buffer, size_t tamanho) {
+    // Sempre seguro: dd/mm/aaaa -> 10 caracteres + '\0' = 11
+    snprintf(buffer, tamanho, "%02d/%02d/%04u", dia, mes, (unsigned int)ano);
+}
+
 
 // ===================== Backup =====================
 void backupArquivos() {
@@ -121,8 +128,6 @@ void carregarBackup() {
                                 &l.ano, &l.exemplares, &l.emprestados);
             if(campos == 7)
                 livros[totalLivros++] = l;
-            else
-                printf("[ERRO] Linha inválida no backup_livros.txt: %s\n", linha);
         }
         fclose(f);
     }
@@ -134,12 +139,10 @@ void carregarBackup() {
             linha[strcspn(linha,"\n")] = 0;
 
             Usuario u;
-            int campos = sscanf(linha,"%d;%100[^;];%50[^;];%15[^;];%10s",
+            int campos = sscanf(linha,"%d;%100[^;];%50[^;];%15[^;];%11s",
                                 &u.matricula, u.nome, u.curso, u.telefone, u.dataCadastro);
             if(campos == 5)
                 usuarios[totalUsuarios++] = u;
-            else
-                printf("[ERRO] Linha inválida no backup_usuarios.txt: %s\n", linha);
         }
         fclose(f);
     }
@@ -151,13 +154,11 @@ void carregarBackup() {
             linha[strcspn(linha,"\n")] = 0;
 
             Emprestimo e;
-            int campos = sscanf(linha,"%d;%d;%d;%10s;%10s;%9s",
+            int campos = sscanf(linha,"%d;%d;%d;%11s;%11s;%9s",
                                 &e.codigoEmprestimo, &e.matriculaUsuario, &e.codigoLivro,
                                 e.dataEmprestimo, e.dataDevolucao, e.status);
             if(campos == 6)
                 emprestimos[totalEmprestimos++] = e;
-            else
-                printf("[ERRO] Linha inválida no backup_emprestimos.txt: %s\n", linha);
         }
         fclose(f);
     }
@@ -200,8 +201,8 @@ void cadastrarUsuario() {
 
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
-    snprintf(u.dataCadastro, sizeof(u.dataCadastro), "%02u/%02u/%04u",
-             (unsigned)tm.tm_mday, (unsigned)(tm.tm_mon+1), (unsigned)(tm.tm_year+1900));
+    formatarData(tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, u.dataCadastro, sizeof(u.dataCadastro));
+
 
     usuarios[totalUsuarios++] = u;
     printf("Usuário cadastrado com sucesso!\n");
@@ -230,13 +231,14 @@ void realizarEmprestimo() {
 
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
-    snprintf(e.dataEmprestimo, sizeof(e.dataEmprestimo), "%02u/%02u/%04u",
-             (unsigned)tm.tm_mday, (unsigned)(tm.tm_mon+1), (unsigned)(tm.tm_year+1900));
-
+    
+    // Data do empréstimo
+    formatarData(tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, e.dataEmprestimo, sizeof(e.dataEmprestimo));
+    
+    // Data de devolução: +7 dias
     tm.tm_mday += 7;
-    mktime(&tm);
-    snprintf(e.dataDevolucao, sizeof(e.dataDevolucao), "%02u/%02u/%04u",
-             (unsigned)tm.tm_mday, (unsigned)(tm.tm_mon+1), (unsigned)(tm.tm_year+1900));
+    mktime(&tm); // ajusta mês/ano se necessário
+    formatarData(tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, e.dataDevolucao, sizeof(e.dataDevolucao));
 
     strcpy(e.status,"ativo");
 
@@ -307,10 +309,10 @@ void pesquisarUsuario(){
         char nome[101];
         printf("Nome: ");
         fgets(nome, sizeof(nome), stdin);
-        nome[strcspn(nome, "\n")] = '\0'; // remove \n
+        nome[strcspn(nome, "\n")] = '\0';
 
         for(int i = 0; i < totalUsuarios; i++){
-            if(strcasecmp(usuarios[i].nome, nome) == 0){ // uso de strcasecmp para comparação sem case sensitive
+            if(strcasecmp(usuarios[i].nome, nome) == 0){
                 printf("Aluno: %s | Matrícula: %d | Curso: %s | Telefone: %s | Cadastro: %s\n",
                        usuarios[i].nome, usuarios[i].matricula, usuarios[i].curso,
                        usuarios[i].telefone, usuarios[i].dataCadastro);
@@ -378,7 +380,7 @@ void listarLivrosDisponiveis() {
 void listarUsuarios() {
     int encontrou=0;
     printf("\n===== Usuários Cadastrados =====\n");
-    printf("Matrícula | Nome\n");
+    printf("Matrícula | Nome | Telefone\n");
     for(int i=0;i<totalUsuarios;i++){
         printf("%d | %s | %s\n", usuarios[i].matricula, usuarios[i].nome, usuarios[i].telefone);
         encontrou=1;
@@ -386,8 +388,68 @@ void listarUsuarios() {
     if(!encontrou) printf("Nenhum usuário cadastrado.\n");
 }
 
-// ===================== Verificar pendencias ===============
+// ===================== Relatório  =====================
+void gerarRelatorioTopLivros() {
+    if(totalLivros==0){ printf("[INFO] Nenhum livro cadastrado.\n"); return; }
 
+    Livro topLivros[MAX_LIVROS];
+    memcpy(topLivros, livros, sizeof(Livro)*totalLivros);
+
+    // ordenar decrescente por emprestados
+    for(int i=0;i<totalLivros-1;i++){
+        for(int j=i+1;j<totalLivros;j++){
+            if(topLivros[j].emprestados > topLivros[i].emprestados){
+                Livro temp = topLivros[i];
+                topLivros[i] = topLivros[j];
+                topLivros[j] = temp;
+            }
+        }
+    }
+
+    int limite = totalLivros<5 ? totalLivros : 5;
+
+    FILE *f = fopen("top5_livros.txt","w");
+    if(!f){ printf("[ERRO] Não foi possível criar o arquivo.\n"); return; }
+
+    printf("\n===== Top %d Livros Mais Emprestados =====\n", limite);
+    printf("%-6s | %-30s | %-10s | %-20s\n", "Código", "Título", "Empréstimos", "Autor");
+    fprintf(f, "%-6s | %-30s | %-10s | %-20s\n", "Código", "Título", "Empréstimos", "Autor");
+
+    for(int i=0;i<limite;i++){
+        printf("%-6d | %-30s | %-10d | %-20s\n",
+               topLivros[i].codigo, topLivros[i].titulo, topLivros[i].emprestados, topLivros[i].autor);
+        fprintf(f, "%-6d | %-30s | %-10d | %-20s\n",
+                topLivros[i].codigo, topLivros[i].titulo, topLivros[i].emprestados, topLivros[i].autor);
+    }
+
+    fclose(f);
+    printf("[INFO] Relatório gerado no arquivo 'top5_livros.txt'.\n");
+}
+
+void renovarEmprestimo() {
+    int codigo;
+    printf("\n===== Renovar Empréstimo =====\n");
+    printf("Digite o código do empréstimo: ");
+    scanf("%d", &codigo);
+
+    for (int i = 0; i < totalEmprestimos; i++) {
+        if (emprestimos[i].codigoEmprestimo == codigo && strcmp(emprestimos[i].status, "ativo") == 0) {
+            time_t t = time(NULL);
+            struct tm tm = *localtime(&t);
+            tm.tm_mday += 7; // adiciona 7 dias
+            mktime(&tm);
+            formatarData(tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, emprestimos[i].dataDevolucao, sizeof(emprestimos[i].dataDevolucao));
+            printf("Empréstimo renovado com sucesso!\nNova data de devolução: %s\n", emprestimos[i].dataDevolucao);
+            backupArquivos();
+            return;
+        }
+    }
+
+    printf("Empréstimo não encontrado ou já devolvido.\n");
+}
+
+
+// ===================== Relatório de Pendências =====================
 void gerarRelatorioPendencias() {
     FILE *f = fopen("pendencias.txt", "w");
     if (!f) {
@@ -397,8 +459,9 @@ void gerarRelatorioPendencias() {
 
     time_t t = time(NULL);
     struct tm *dataAtual = localtime(&t);
-    char hoje[11];
-    snprintf(hoje, sizeof(hoje), "%02d/%02d/%04d", dataAtual->tm_mday, dataAtual->tm_mon + 1, dataAtual->tm_year + 1900);
+    char hoje[12];
+    formatarData(dataAtual->tm_mday, dataAtual->tm_mon + 1, dataAtual->tm_year + 1900, hoje, sizeof(hoje));
+
 
     int encontrou = 0;
 
@@ -422,8 +485,6 @@ void gerarRelatorioPendencias() {
             if (u && l) {
                 fprintf(f, "Usuário: %s | Matrícula: %d | Telefone: %s\n", u->nome, u->matricula, u->telefone);
                 fprintf(f, "Livro: %s | Código: %d | Data de devolução: %s\n\n", l->titulo, l->codigo, emprestimos[i].dataDevolucao);
-                printf("============================\nUsuário: %s | Matrícula: %d | Telefone: %s\n", u->nome, u->matricula, u->telefone);
-                printf("Livro: %s | Código: %d | Data de devolução: %s\n\n", l->titulo, l->codigo, emprestimos[i].dataDevolucao);
                 encontrou = 1;
             }
         }
@@ -433,11 +494,12 @@ void gerarRelatorioPendencias() {
 
     if (!encontrou) {
         printf("[INFO] Nenhuma pendência encontrada.\n");
-        remove("pendencias.txt"); // remove o arquivo se estiver vazio
+        remove("pendencias.txt"); 
     } else {
         printf("[INFO] Pendências atualizadas no arquivo 'pendencias.txt'.\n");
     }
 }
+
 
 
 // ===================== Menu =====================
@@ -445,7 +507,8 @@ void menu() {
     printf("\n===== Biblioteca =====\n");
     printf("1. Cadastrar Livro\n2. Cadastrar Usuário\n3. Realizar Empréstimo\n4. Realizar Devolucão\n");
     printf("5. Pesquisar Livro\n6. Pesquisar Usuário\n7. Listar Empréstimos Ativos\n");
-    printf("8. Listar Livros Disponíveis\n9. Listar Usuários\n10. Verificar pendencias\n0. Sair\n");
+    printf("8. Listar Livros Disponíveis\n9. Listar Usuários\n10. Verificar pendencias\n");
+    printf("11. Relatório: Top 5 livros mais emprestados\n12. Renovar emprestimo\n0. Sair\n");
     printf("Escolha uma opção: ");
 }
 
@@ -467,6 +530,8 @@ int main() {
             case 8: listarLivrosDisponiveis(); break;
             case 9: listarUsuarios(); break;
             case 10: gerarRelatorioPendencias(); break;
+            case 11: gerarRelatorioTopLivros(); break;
+            case 12: renovarEmprestimo();break;
             case 0: printf("Saindo...\n"); break;
             default: printf("Opção inválida!\n");
         }
